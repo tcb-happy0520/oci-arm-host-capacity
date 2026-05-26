@@ -64,6 +64,24 @@ $notifier = (function (): \Hitrov\Interfaces\NotifierInterface {
     return new \Hitrov\Notification\Telegram();
 })();
 
+$telegramNotifyAlways = in_array(
+    strtolower((string) getenv('TELEGRAM_NOTIFY_ALWAYS')),
+    ['1', 'true', 'yes', 'on'],
+    true
+);
+
+$notify = function (string $message, bool $force = false) use ($notifier, $telegramNotifyAlways): void {
+    if (!$notifier->isSupported()) {
+        return;
+    }
+
+    if (!$force && !$telegramNotifyAlways) {
+        return;
+    }
+
+    $notifier->notify($message);
+};
+
 $shape = getenv('OCI_SHAPE');
 
 $maxRunningInstancesOfThatShape = 1;
@@ -72,55 +90,64 @@ if ($maxInstancesEnv !== false && $maxInstancesEnv !== '') {
     $maxRunningInstancesOfThatShape = (int) $maxInstancesEnv;
 }
 
-$instances = $api->getInstances($config);
+$lastFailureMessage = '';
 
-$existingInstances = $api->checkExistingInstances($config, $instances, $shape, $maxRunningInstancesOfThatShape);
-if ($existingInstances) {
-    echo "$existingInstances\n";
-    return;
-}
+try {
+    $instances = $api->getInstances($config);
 
-if (!empty($config->availabilityDomains)) {
-    if (is_array($config->availabilityDomains)) {
-        $availabilityDomains = $config->availabilityDomains;
-    } else {
-        $availabilityDomains = [ $config->availabilityDomains ];
-    }
-} else {
-    $availabilityDomains = $api->getAvailabilityDomains($config);
-}
-
-foreach ($availabilityDomains as $availabilityDomainEntity) {
-    $availabilityDomain = is_array($availabilityDomainEntity) ? $availabilityDomainEntity['name'] : $availabilityDomainEntity;
-    try {
-        $instanceDetails = $api->createInstance($config, $shape, getenv('OCI_SSH_PUBLIC_KEY'), $availabilityDomain);
-    } catch(ApiCallException $e) {
-        $message = $e->getMessage();
-        echo "$message\n";
-//            if ($notifier->isSupported()) {
-//                $notifier->notify($message);
-//            }
-
-        if (
-            $e->getCode() === 500 &&
-            strpos($message, 'InternalError') !== false &&
-            strpos($message, 'Out of host capacity') !== false
-        ) {
-            // trying next availability domain
-            sleep(16);
-            continue;
-        }
-
-        // current config is broken
+    $existingInstances = $api->checkExistingInstances($config, $instances, $shape, $maxRunningInstancesOfThatShape);
+    if ($existingInstances) {
+        echo "$existingInstances\n";
+        $notify($existingInstances);
         return;
     }
 
-    // success
-    $message = json_encode($instanceDetails, JSON_PRETTY_PRINT);
-    echo "$message\n";
-    if ($notifier->isSupported()) {
-        $notifier->notify($message);
+    if (!empty($config->availabilityDomains)) {
+        if (is_array($config->availabilityDomains)) {
+            $availabilityDomains = $config->availabilityDomains;
+        } else {
+            $availabilityDomains = [ $config->availabilityDomains ];
+        }
+    } else {
+        $availabilityDomains = $api->getAvailabilityDomains($config);
     }
 
-    return;
+    foreach ($availabilityDomains as $availabilityDomainEntity) {
+        $availabilityDomain = is_array($availabilityDomainEntity) ? $availabilityDomainEntity['name'] : $availabilityDomainEntity;
+        try {
+            $instanceDetails = $api->createInstance($config, $shape, getenv('OCI_SSH_PUBLIC_KEY'), $availabilityDomain);
+        } catch(ApiCallException $e) {
+            $message = $e->getMessage();
+            $lastFailureMessage = $message;
+            echo "$message\n";
+
+            if (
+                $e->getCode() === 500 &&
+                strpos($message, 'InternalError') !== false &&
+                strpos($message, 'Out of host capacity') !== false
+            ) {
+                // trying next availability domain
+                sleep(16);
+                continue;
+            }
+
+            $notify($message);
+            return;
+        }
+
+        // success
+        $message = json_encode($instanceDetails, JSON_PRETTY_PRINT);
+        echo "$message\n";
+        $notify($message, true);
+
+        return;
+    }
+
+    if ($lastFailureMessage !== '') {
+        $notify($lastFailureMessage);
+    }
+} catch (\Throwable $throwable) {
+    $message = $throwable->getMessage();
+    echo "$message\n";
+    $notify($message);
 }
