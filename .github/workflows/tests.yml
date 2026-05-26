@@ -41,15 +41,20 @@ jobs:
       - name: Install dependencies
         run: |
           composer update --prefer-dist --no-progress
+
+      # 這裡進行了修改：執行前先將 Secrets 的文字轉成實體金鑰檔案 oracle_key.pem
       - name: Run script
         run: |
+          echo "${{ secrets.OCI_PRIVATE_KEY_FILENAME }}" > oracle_key.pem
+          chmod 600 oracle_key.pem
           php index.php
         env:
           OCI_REGION: ${{ secrets.OCI_REGION }}
           OCI_USER_ID: ${{ secrets.OCI_USER_ID }}
           OCI_TENANCY_ID: ${{ secrets.OCI_TENANCY_ID }}
           OCI_KEY_FINGERPRINT: ${{ secrets.OCI_KEY_FINGERPRINT }}
-          OCI_PRIVATE_KEY_FILENAME: ${{ secrets.OCI_PRIVATE_KEY_FILENAME }}
+          # 關鍵點：這裡固定讀取剛剛建立的實體檔案名稱
+          OCI_PRIVATE_KEY_FILENAME: oracle_key.pem
           OCI_AVAILABILITY_DOMAIN: ${{ secrets.OCI_AVAILABILITY_DOMAIN }}
           OCI_SUBNET_ID: ${{ secrets.OCI_SUBNET_ID }}
           OCI_IMAGE_ID: ${{ secrets.OCI_IMAGE_ID }}
@@ -63,4 +68,3 @@ jobs:
           AD_ALWAYS_FREE: ${{ secrets.AD_ALWAYS_FREE }}
           TEST_IMAGE_ID: ${{ secrets.TEST_IMAGE_ID }}
           TEST_SUBNET_ID: ${{ secrets.TEST_SUBNET_ID }}
-
