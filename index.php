@@ -69,7 +69,6 @@ $shape = getenv('OCI_SHAPE');
 $maxRunningInstancesOfThatShape = 1;
 $maxInstancesEnv = getenv('OCI_MAX_INSTANCES');
 if ($maxInstancesEnv !== false && $maxInstancesEnv !== '') {
-    $maxRunningInstancesOfThatShape = (int) $maxInstancesEnv
     $maxRunningInstancesOfThatShape = (int) $maxInstancesEnv;
 }
 
