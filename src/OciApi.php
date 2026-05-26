@@ -55,45 +55,45 @@ class OciApi
 
         $displayName = 'instance-' . date('Ymd-Hi');
 
-        $body = <<<EOD
-{
-    "metadata": {
-        "ssh_authorized_keys": "$sshKey"
-    },
-    "shape": "$shape",
-    "compartmentId": "{$config->tenancyId}",
-    "displayName": "$displayName",
-    "availabilityDomain": "$availabilityDomain",
-    "sourceDetails": {$config->getSourceDetails()},
-    "createVnicDetails": {
-        "assignPublicIp": false,
-        "subnetId": "{$config->subnetId}",
-        "assignPrivateDnsRecord": true
-    },
-    "agentConfig": {
-        "pluginsConfig": [
-            {
-                "name": "Compute Instance Monitoring",
-                "desiredState": "ENABLED"
-            }
-        ],
-        "isMonitoringDisabled": false,
-        "isManagementDisabled": false
-    },
-    "definedTags": {},
-    "freeformTags": {},
-    "instanceOptions": {
-        "areLegacyImdsEndpointsDisabled": false
-    },
-    "availabilityConfig": {
-        "recoveryAction": "RESTORE_INSTANCE"
-    },
-    "shapeConfig": {
-        "ocpus": {$config->ocpus},
-        "memoryInGBs": {$config->memoryInGBs}
-    }
-}
-EOD;
+        $bodyArray = [
+            'metadata' => [
+                'ssh_authorized_keys' => $sshKey,
+            ],
+            'shape' => $shape,
+            'compartmentId' => $config->tenancyId,
+            'displayName' => $displayName,
+            'availabilityDomain' => $availabilityDomain,
+            'sourceDetails' => json_decode($config->getSourceDetails(), true),
+            'createVnicDetails' => [
+                'assignPublicIp' => false,
+                'subnetId' => $config->subnetId,
+                'assignPrivateDnsRecord' => true,
+            ],
+            'agentConfig' => [
+                'pluginsConfig' => [
+                    [
+                        'name' => 'Compute Instance Monitoring',
+                        'desiredState' => 'ENABLED',
+                    ],
+                ],
+                'isMonitoringDisabled' => false,
+                'isManagementDisabled' => false,
+            ],
+            'definedTags' => (object) [],
+            'freeformTags' => (object) [],
+            'instanceOptions' => [
+                'areLegacyImdsEndpointsDisabled' => false,
+            ],
+            'availabilityConfig' => [
+                'recoveryAction' => 'RESTORE_INSTANCE',
+            ],
+            'shapeConfig' => [
+                'ocpus' => $config->ocpus,
+                'memoryInGBs' => $config->memoryInGBs,
+            ],
+        ];
+
+        $body = json_encode($bodyArray);
 
         $baseUrl = "{$this->getBaseApiUrl($config)}/instances/";
 
