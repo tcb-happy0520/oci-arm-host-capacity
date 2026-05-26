@@ -67,8 +67,9 @@ $notifier = (function (): \Hitrov\Interfaces\NotifierInterface {
 $shape = getenv('OCI_SHAPE');
 
 $maxRunningInstancesOfThatShape = 1;
-if (getenv('OCI_MAX_INSTANCES') !== false) {
-    $maxRunningInstancesOfThatShape = (int) getenv('OCI_MAX_INSTANCES');
+$maxInstancesEnv = getenv('OCI_MAX_INSTANCES');
+if ($maxInstancesEnv !== false && $maxInstancesEnv !== '') {
+    $maxRunningInstancesOfThatShape = (int) $maxInstancesEnv;
 }
 
 $instances = $api->getInstances($config);
